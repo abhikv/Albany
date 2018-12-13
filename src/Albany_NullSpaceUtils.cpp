@@ -201,7 +201,7 @@ void subtractCentroid(const Teuchos::RCP<Tpetra_MultiVector> &coordMV)
 
 RigidBodyModes::RigidBodyModes(int numPDEs_)
   : numPDEs(numPDEs_), numElasticityDim(0), nullSpaceDim(0),
-    numScalar(0), mlUsed(false), mueLuUsed(false), setNonElastRBM(false)
+    numScalar(0), mlUsed(false), mueLuUsed(false), froschUsed(false), setNonElastRBM(false)
 {}
 
 void RigidBodyModes::
@@ -210,7 +210,7 @@ setPiroPL(const Teuchos::RCP<Teuchos::ParameterList>& piroParams)
   const Teuchos::RCP<Teuchos::ParameterList>
     stratList = Piro::extractStratimikosParams(piroParams);
 
-  mlUsed = mueLuUsed = false;
+  mlUsed = mueLuUsed = froschUsed = false;
   if (Teuchos::nonnull(stratList) &&
       stratList->isParameter("Preconditioner Type")) {
     const std::string&
@@ -224,13 +224,17 @@ setPiroPL(const Teuchos::RCP<Teuchos::ParameterList>& piroParams)
       plist = sublist(sublist(stratList, "Preconditioner Types"), ptype);
       mueLuUsed = true;
     }
+    else if (ptype == "FROSch") {
+      plist = sublist(sublist(stratList, "Preconditioner Types"), ptype);
+      froschUsed = true;
+    }
   }
 }
 
 void RigidBodyModes::
-updatePL(const Teuchos::RCP<Teuchos::ParameterList>& mlParams)
+updatePL(const Teuchos::RCP<Teuchos::ParameterList>& precParams)
 {
-  plist = mlParams;
+  plist = precParams;
 }
 
 void RigidBodyModes::setParameters(
@@ -251,9 +255,9 @@ setCoordinates(const Teuchos::RCP<Tpetra_MultiVector> &coordMV_)
   coordMV = coordMV_;
 
   TEUCHOS_TEST_FOR_EXCEPTION(
-    !isMLUsed() && !isMueLuUsed(),
+    !isMLUsed() && !isMueLuUsed() && !isFROSchUsed(),
     std::logic_error,
-    "setCoordinates was called without setting an ML or MueLu parameter list.");
+    "setCoordinates was called without setting an ML, MueLu or FROSch parameter list.");
 
   const RigidBodyModes::LO_type numNodes = coordMV->getLocalLength(); // length of each vector in the multivector
   int numSpaceDim = coordMV->getNumVectors(); // Number of multivectors are the dimension of the problem
@@ -299,7 +303,8 @@ setCoordinates(const Teuchos::RCP<Tpetra_MultiVector> &coordMV_)
 
 void RigidBodyModes::
 setCoordinatesAndNullspace(const Teuchos::RCP<Tpetra_MultiVector> &coordMV,
-                           const Teuchos::RCP<const Tpetra_Map>& soln_map)
+                           const Teuchos::RCP<const Tpetra_Map>& soln_map,
+                           const Teuchos::RCP<const Tpetra_Map>& soln_overlap_map)
 {
   // numPDEs = # PDEs
   // numElasticityDim = # elasticity dofs
@@ -352,6 +357,10 @@ setCoordinatesAndNullspace(const Teuchos::RCP<Tpetra_MultiVector> &coordMV,
         soln_map.is_null(), std::logic_error,
         "numElasticityDim > 0 and isMueLuUsed(): soln_map must be provided.");
       plist->set("Nullspace", trr);
+
+      if(isFROSchUsed()) {
+        plist->set("Overlapped Map", soln_overlap_map);
+      }
     }
   }
 }

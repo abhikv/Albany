@@ -687,7 +687,7 @@ void
 Albany::STKDiscretization::setupMLCoords()
 {
   if (rigidBodyModes.is_null()) return;
-  if (!rigidBodyModes->isMLUsed() && !rigidBodyModes->isMueLuUsed()) return;
+  if (!rigidBodyModes->isMLUsed() && !rigidBodyModes->isMueLuUsed() && !rigidBodyModes->isFROSchUsed()) return;
 
   const int                                   numDim = stkMeshStruct->numDim;
   AbstractSTKFieldContainer::VectorFieldType* coordinates_field =
@@ -702,7 +702,7 @@ Albany::STKDiscretization::setupMLCoords()
       coordMV->replaceLocalValue(node_lid, j, X[j]);
   }
 
-  rigidBodyModes->setCoordinatesAndNullspace(coordMV, mapT);
+  rigidBodyModes->setCoordinatesAndNullspace(coordMV, mapT, overlap_mapT);
 
   // Some optional matrix-market output was tagged on here; keep that
   // functionality.
@@ -714,7 +714,7 @@ Albany::STKDiscretization::writeCoordsToMatrixMarket() const
 {
   // if user wants to write the coordinates to matrix market file, write them to
   // matrix market file
-  if ((rigidBodyModes->isMLUsed() || rigidBodyModes->isMueLuUsed()) && stkMeshStruct->writeCoordsToMMFile) {
+  if ((rigidBodyModes->isMLUsed() || rigidBodyModes->isMueLuUsed() || rigidBodyModes->isFROSchUsed()) && stkMeshStruct->writeCoordsToMMFile) {
     if (node_mapT->getComm()->getRank() == 0) {
       std::cout << "Writing mesh coordinates to Matrix Market file."
                 << std::endl;
